@@ -1,0 +1,55 @@
+version: "3.7"
+
+services:
+
+  api:
+    build:
+      context: .
+    volumes:
+      - .:/app:z
+    ports:
+      - 5000:5000
+    depends_on:
+      - keycloak.auth
+    restart: always
+    environment:
+      - OAUTHLIB_INSECURE_TRANSPORT=1
+
+  database:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=keycloak
+      - POSTGRES_DB=keycloak
+      - POSTGRES_PASSWORD=keycloak
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 5432:5432
+
+  keycloak.auth:
+    image: quay.io/keycloak/keycloak:20.0
+    command: ["start-dev", "-Dkeycloak.migration.action=import", "-Dkeycloak.migration.provider=singleFile", "-Dkeycloak.migration.strategy=OVERWRITE_EXISTING", "-Dkeycloak.migration.file=/opt/keycloak/data/import/master.json"]
+    environment:
+      DB_VENDOR: postgres
+      DB_ADDR: database
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_SCHEMA: public
+      DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - 8080:8080
+    depends_on:
+      - database
+    volumes:
+      - ./keycloak-data:/opt/keycloak/data/import
+
+volumes:
+  pg_data:
